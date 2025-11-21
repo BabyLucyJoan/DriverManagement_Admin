@@ -1,7 +1,10 @@
 import { useEffect, useState, useContext } from "react";
 import { AuthContext } from "../context/AuthContext";
 import { Navigate } from "react-router-dom";
+import { toast } from "react-toastify";
 import api from "../services/api";
+import { PENALTIES } from "../constants";
+import LoadingSpinner from "../components/LoadingSpinner";
 import {
   Button,
   Table,
@@ -24,21 +27,6 @@ import {
 } from "@mui/material";
 import { Add } from "@mui/icons-material";
 
-const PENALTIES = [
-  { name: "Overspeeding", amount: 50 },
-  { name: "Geofencing", amount: 200 },
-  { name: "Late Payment", amount: 50 },
-  { name: "Locking Car", amount: 50 },
-  { name: "Car Sharing", amount: 200 },
-  { name: "Number of Trips", amount: 100 },
-  { name: "Photocheck", amount: 100 },
-  { name: "Self Repair", amount: 100 },
-  { name: "Servicing Show Up Failure", amount: 50 },
-  { name: "Inspection Show Up Failure", amount: 100 },
-  { name: "Recovery (Based on Location)", amount: 150 },
-  { name: "Accident (20% of total cost)", amount: "20%" },
-];
-
 const Penalties = () => {
   const { user } = useContext(AuthContext);
   const [drivers, setDrivers] = useState([]);
@@ -48,20 +36,30 @@ const Penalties = () => {
   const [penaltyType, setPenaltyType] = useState("");
   const [penaltyAmount, setPenaltyAmount] = useState(0);
   const [reason, setReason] = useState("");
+  const [loading, setLoading] = useState(true);
 
   const hasPermission =
     user.role === "admin" || user.permissions.includes("add_penalties");
 
   useEffect(() => {
+    const controller = new AbortController();
+
     const fetchDrivers = async () => {
+      setLoading(true);
       try {
-        const res = await api.get("/drivers");
+        const res = await api.get("/drivers", { signal: controller.signal });
         setDrivers(res.data);
       } catch (err) {
-        console.error(err);
+        if (err.name !== "AbortError") {
+          toast.error("Failed to load drivers");
+        }
+      } finally {
+        setLoading(false);
       }
     };
     fetchDrivers();
+
+    return () => controller.abort();
   }, []);
 
   const handleAddPenalty = async () => {
@@ -69,26 +67,31 @@ const Penalties = () => {
       await api.post("/penalties", {
         driverId: selectedDriver._id,
         type: penaltyType,
-        amount,
+        amount: penaltyAmount,
         reason,
       });
       setOpen(false);
+      toast.success("Penalty added successfully");
       // Refresh drivers or penalties
       // ...
     } catch (err) {
-      alert("Failed to add penalty");
+      toast.error(err.response?.data?.message || "Failed to add penalty");
     }
   };
 
   if (!hasPermission) return <Navigate to="/unauthorized" />;
 
+  if (loading) {
+    return <LoadingSpinner text="Loading drivers..." />;
+  }
+
   return (
     <Box sx={{ p: 3 }}>
-      <Typography variant="h5" gutterBottom>
+      <Typography variant="h5" gutterBottom sx={{ mb: 3, fontWeight: 700 }}>
         Penalties Management
       </Typography>
 
-      <Paper>
+      <Paper elevation={3}>
         <Table>
           <TableHead>
             <TableRow>
