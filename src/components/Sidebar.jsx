@@ -14,6 +14,7 @@ import {
   People as PeopleIcon,
   DirectionsCar as DriverIcon,
   Warning as WarningIcon,
+  History as HistoryIcon,
   Logout as LogoutIcon,
 } from "@mui/icons-material";
 import { Link, useNavigate, useLocation } from "react-router-dom";
@@ -57,6 +58,12 @@ const Sidebar = memo(() => {
       label: "Penalties",
       icon: <WarningIcon />,
       show: user.role === "admin" || user.permissions.includes("add_penalties"),
+    },
+    {
+      path: "/audit-log",
+      label: "Audit Log",
+      icon: <HistoryIcon />,
+      show: user.role === "admin",
     },
   ];
 

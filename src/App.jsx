@@ -9,6 +9,7 @@ import StaffManagement from "./pages/StaffManagement";
 import DriverApproval from "./pages/DriverApproval";
 import Layout from "./components/Layout"; // ← ADD
 import Penalties from "./pages/Penalties";
+import AuditLog from "./pages/AuditLog";
 import ProtectedRoute from "./components/ProtectedRoute";
 
 function App() {
@@ -58,6 +59,16 @@ function App() {
           <ProtectedRoute allowedPermissions={["add_penalties"]}>
             <Layout title="Penalties">
               <Penalties />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/audit-log"
+        element={
+          <ProtectedRoute allowedRoles={["admin"]}>
+            <Layout title="Audit Log">
+              <AuditLog />
             </Layout>
           </ProtectedRoute>
         }

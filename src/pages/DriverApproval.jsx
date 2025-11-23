@@ -143,8 +143,7 @@ const DriverApproval = () => {
       setForm({ name: "", phone: "", ghanaCard: "", password: "", isApproved: false });
       fetchDrivers();
       toast.success("Driver updated successfully");
-    } catch (err) {
-      console.log(err);
+    } catch {
       toast.error("Failed to update driver");
     }
   };
