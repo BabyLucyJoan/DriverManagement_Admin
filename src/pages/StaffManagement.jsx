@@ -23,8 +23,10 @@ import {
   InputLabel,
   Select,
   MenuItem,
+  Tooltip,
+  InputAdornment
 } from "@mui/material";
-import { Add, Delete, Edit } from "@mui/icons-material";
+import { Add, Delete, Edit, Search } from "@mui/icons-material";
 import { toast } from "react-toastify";
 import api from "../services/api";
 import LoadingSpinner from "../components/LoadingSpinner";
@@ -42,6 +44,7 @@ export default function StaffManagement() {
   const [permissions, setPermissions] = useState([]);
   const [availablePermissions, setAvailablePermissions] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
 
   const fetchStaff = async () => {
     setLoading(true);
@@ -176,8 +179,7 @@ export default function StaffManagement() {
       setPermissions([]);
       fetchStaff();
       toast.success("Staff member updated successfully");
-    } catch(err) {
-      console.log(err);
+    } catch {
       toast.error("Failed to update staff member");
     }
   };
@@ -194,6 +196,10 @@ export default function StaffManagement() {
       }
     }
   };
+
+  const filteredStaff = staff.filter((s) =>
+    s.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   if (loading) {
     return <LoadingSpinner text="Loading staff members..." />;
@@ -223,6 +229,22 @@ export default function StaffManagement() {
         </Button>
       </Box>
 
+      <Box sx={{ mb: 3 }}>
+        <TextField
+          fullWidth
+          placeholder="Search by name..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          slotProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <Search />
+              </InputAdornment>
+            ),
+          }}
+        />
+      </Box>
+
       <TableContainer component={Paper}>
         <Table>
           <TableHead>
@@ -236,13 +258,13 @@ export default function StaffManagement() {
             </TableRow>
           </TableHead>
           <TableBody>
-            {staff.length === 0 ? (
+            {filteredStaff.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={4}>
+                <TableCell colSpan={6}>
                   <EmptyState
-                    message="No staff members found"
-                    actionText="Add First Staff Member"
-                    onAction={() => {
+                    message={searchQuery ? "No staff members found matching your search" : "No staff members found"}
+                    actionText={searchQuery ? "" : "Add First Staff Member"}
+                    onAction={searchQuery ? undefined : () => {
                       setIsEditMode(false);
                       setEditingStaffId(null);
                       setName("");
@@ -256,7 +278,7 @@ export default function StaffManagement() {
                 </TableCell>
               </TableRow>
             ) : (
-              staff.map((s) => (
+              filteredStaff.map((s) => (
                 <TableRow key={s._id}>
                   <TableCell>{s.name}</TableCell>
                   <TableCell>{s.email}</TableCell>
@@ -277,13 +299,17 @@ export default function StaffManagement() {
                     />
                   </TableCell>
                   <TableCell>
+                    <Tooltip title="Edit Staff">
                     <IconButton
                       color="primary"
-                      onClick={() => handleEdit(s)}
+                      onClick={() => handleEdit(s)}        
+                      sx={{ color: '#1976d2' }}
                       aria-label={`Edit ${s.name}`}
                     >
                       <Edit />
                     </IconButton>
+                    </Tooltip>
+                    <Tooltip title="Delete Staff">
                     <IconButton
                       color="error"
                       onClick={() => handleDelete(s._id)}
@@ -291,6 +317,7 @@ export default function StaffManagement() {
                     >
                       <Delete />
                     </IconButton>
+                    </Tooltip>
                   </TableCell>
                 </TableRow>
               ))

@@ -24,8 +24,10 @@ import {
   DialogContent,
   DialogActions,
   Chip,
+  TextField,
+  InputAdornment
 } from "@mui/material";
-import { Add } from "@mui/icons-material";
+import { Add, Search } from "@mui/icons-material";
 
 const Penalties = () => {
   const { user } = useContext(AuthContext);
@@ -37,6 +39,7 @@ const Penalties = () => {
   const [penaltyAmount, setPenaltyAmount] = useState(0);
   const [reason, setReason] = useState("");
   const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
 
   const hasPermission =
     user.role === "admin" || user.permissions.includes("add_penalties");
@@ -79,6 +82,10 @@ const Penalties = () => {
     }
   };
 
+  const filteredDrivers = drivers.filter((d) =>
+    d.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
   if (!hasPermission) return <Navigate to="/unauthorized" />;
 
   if (loading) {
@@ -91,6 +98,22 @@ const Penalties = () => {
         Penalties Management
       </Typography>
 
+      <Box sx={{ mb: 3 }}>
+        <TextField
+          fullWidth
+          placeholder="Search by name..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          slotProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <Search />
+              </InputAdornment>
+            ),
+          }}
+        />
+      </Box>
+
       <Paper elevation={3}>
         <Table>
           <TableHead>
@@ -102,7 +125,16 @@ const Penalties = () => {
             </TableRow>
           </TableHead>
           <TableBody>
-            {drivers.map((d) => (
+            {filteredDrivers.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={4} align="center">
+                  <Typography variant="body2" color="text.secondary" sx={{ py: 3 }}>
+                    {searchQuery ? "No drivers found matching your search" : "No drivers found"}
+                  </Typography>
+                </TableCell>
+              </TableRow>
+            ) : (
+              filteredDrivers.map((d) => (
               <TableRow key={d._id}>
                 <TableCell>{d.name}</TableCell>
                 <TableCell>{d.ghanaCard}</TableCell>
@@ -127,7 +159,8 @@ const Penalties = () => {
                   </Button>
                 </TableCell>
               </TableRow>
-            ))}
+              ))
+            )}
           </TableBody>
         </Table>
       </Paper>

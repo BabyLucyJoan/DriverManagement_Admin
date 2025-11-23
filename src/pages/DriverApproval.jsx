@@ -9,6 +9,7 @@ import {
   Table,
   TableBody,
   TableCell,
+  TableContainer,
   TableHead,
   TableRow,
   Paper,
@@ -20,34 +21,53 @@ import {
   DialogContent,
   DialogActions,
   TextField,
-  Alert,
+  IconButton,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  Tooltip,
+  InputAdornment,
 } from "@mui/material";
-import { Add as AddIcon } from "@mui/icons-material";
+import { Add, Edit, Search } from "@mui/icons-material";
+import { toast } from "react-toastify";
+import LoadingSpinner from "../components/LoadingSpinner";
+import EmptyState from "../components/EmptyState";
 
 const DriverApproval = () => {
   const { user } = useContext(AuthContext);
   const [drivers, setDrivers] = useState([]);
   const [open, setOpen] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editingDriverId, setEditingDriverId] = useState(null);
   const [form, setForm] = useState({
     name: "",
     phone: "",
     ghanaCard: "",
+    password: "",
+    isApproved: false,
   });
-  const [message, setMessage] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
 
   const hasPermission =
     user.role === "admin" || user.permissions.includes("approve_drivers");
 
   useEffect(() => {
+    const controller = new AbortController();
     fetchDrivers();
+    return () => controller.abort();
   }, []);
 
   const fetchDrivers = async () => {
+    setLoading(true);
     try {
       const res = await api.get("/drivers");
       setDrivers(res.data);
-    } catch (err) {
-      console.error("Failed to fetch drivers:", err);
+    } catch {
+      toast.error("Failed to load drivers");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -57,34 +77,105 @@ const DriverApproval = () => {
       setDrivers(
         drivers.map((d) => (d._id === id ? { ...d, isApproved: true } : d))
       );
-      setMessage("Driver approved successfully!");
-      setTimeout(() => setMessage(""), 4000);
+      toast.success("Driver approved successfully!");
     } catch {
-      setMessage("Approval failed");
+      toast.error("Approval failed");
     }
   };
 
-  const handleAddDriver = async () => {
+  const handleEdit = (driver) => {
+    setIsEditMode(true);
+    setEditingDriverId(driver._id);
+    setForm({
+      name: driver.name,
+      phone: driver.phone,
+      ghanaCard: driver.ghanaCard,
+      password: "",
+      isApproved: driver.isApproved,
+    });
+    setOpen(true);
+  };
+
+  const handleUpdate = async () => {
     if (!form.name || !form.phone || !form.ghanaCard) {
-      setMessage("All fields are required");
-      return;
-    }
-
-    // Phone validation
-    if (!VALIDATION.PHONE.test(form.phone)) {
-      setMessage(ERROR_MESSAGES.PHONE_INVALID);
-      return;
-    }
-
-    // Ghana Card validation
-    if (!VALIDATION.GHANA_CARD.test(form.ghanaCard)) {
-      setMessage(ERROR_MESSAGES.GHANA_CARD_INVALID);
+      toast.error("All fields except password are required");
       return;
     }
 
     // Name validation
     if (!VALIDATION.NAME.test(form.name)) {
-      setMessage(ERROR_MESSAGES.NAME_INVALID);
+      toast.error(ERROR_MESSAGES.NAME_INVALID);
+      return;
+    }
+
+    // Phone validation
+    if (!VALIDATION.PHONE.test(form.phone)) {
+      toast.error(ERROR_MESSAGES.PHONE_INVALID);
+      return;
+    }
+
+    // Ghana Card validation
+    if (!VALIDATION.GHANA_CARD.test(form.ghanaCard)) {
+      toast.error(ERROR_MESSAGES.GHANA_CARD_INVALID);
+      return;
+    }
+
+    // Password validation (only if provided)
+    if (form.password && form.password.length < 6) {
+      toast.error("Password must be at least 6 characters");
+      return;
+    }
+
+    try {
+      const updateData = {
+        name: form.name,
+        phone: form.phone,
+        ghanaCard: form.ghanaCard,
+        isApproved: form.isApproved,
+      };
+      if (form.password) {
+        updateData.password = form.password;
+      }
+      await api.put(`/drivers/${editingDriverId}`, updateData);
+      setOpen(false);
+      setIsEditMode(false);
+      setEditingDriverId(null);
+      setForm({ name: "", phone: "", ghanaCard: "", password: "", isApproved: false });
+      fetchDrivers();
+      toast.success("Driver updated successfully");
+    } catch (err) {
+      console.log(err);
+      toast.error("Failed to update driver");
+    }
+  };
+
+  const handleAddDriver = async () => {
+    if (!form.name || !form.phone || !form.ghanaCard || !form.password) {
+      toast.error("All fields are required");
+      return;
+    }
+
+    // Name validation
+    if (!VALIDATION.NAME.test(form.name)) {
+      toast.error(ERROR_MESSAGES.NAME_INVALID);
+      return;
+    }
+
+    // Phone validation
+    if (!VALIDATION.PHONE.test(form.phone)) {
+      toast.error(ERROR_MESSAGES.PHONE_INVALID);
+      return;
+    }
+
+    // Ghana Card validation
+    if (!VALIDATION.GHANA_CARD.test(form.ghanaCard)) {
+      toast.error(ERROR_MESSAGES.GHANA_CARD_INVALID);
+      return;
+    }
+
+    // Password validation
+    if (form.password.length < 6) {
+      toast.error("Password must be at least 6 characters");
       return;
     }
 
@@ -93,54 +184,67 @@ const DriverApproval = () => {
         name: form.name,
         phone: form.phone,
         ghanaCard: form.ghanaCard,
+        password: form.password,
       });
 
-      setMessage("Driver added successfully! Pending approval.");
       setOpen(false);
-      setForm({ name: "", phone: "", ghanaCard: "" });
+      setForm({ name: "", phone: "", ghanaCard: "", password: "" });
       fetchDrivers();
-    } catch (err) {
-      setMessage(
-        err.response?.data?.message ||
-          "Failed to add driver (maybe phone exists)"
+      toast.success("Driver added successfully!");
+    } catch {
+      toast.error(
+       "Failed to add driver"
       );
     }
   };
 
+  const filteredDrivers = drivers.filter((d) =>
+    d.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
   if (!hasPermission) return <Navigate to="/unauthorized" />;
+
+  if (loading) {
+    return <LoadingSpinner text="Loading drivers..." />;
+  }
 
   return (
     <Box sx={{ p: 3 }}>
-      <Box
-        sx={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          mb: 3,
-        }}
-      >
+      <Box sx={{ display: "flex", justifyContent: "space-between", mb: 3 }}>
         <Typography variant="h5" fontWeight="bold">
           Driver Management
         </Typography>
         <Button
           variant="contained"
-          startIcon={<AddIcon />}
-          onClick={() => setOpen(true)}
+          startIcon={<Add />}
+          onClick={() => {
+            setIsEditMode(false);
+            setEditingDriverId(null);
+            setForm({ name: "", phone: "", ghanaCard: "", password: "", isApproved: false });
+            setOpen(true);
+          }}
         >
           Add Driver
         </Button>
       </Box>
 
-      {message && (
-        <Alert
-          severity={message.includes("success") ? "success" : "error"}
-          sx={{ mb: 2 }}
-        >
-          {message}
-        </Alert>
-      )}
+      <Box sx={{ mb: 3 }}>
+        <TextField
+          fullWidth
+          placeholder="Search by name..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          slotProps ={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <Search />
+              </InputAdornment>
+            ),
+          }}
+        />
+      </Box>
 
-      <Paper elevation={3}>
+      <TableContainer component={Paper}>
         <Table>
           <TableHead>
             <TableRow>
@@ -152,32 +256,52 @@ const DriverApproval = () => {
             </TableRow>
           </TableHead>
           <TableBody>
-            {drivers.length === 0 ? (
+            {filteredDrivers.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} align="center" sx={{ py: 4 }}>
-                  No drivers registered yet
+                <TableCell colSpan={5}>
+                  <EmptyState
+                    message={searchQuery ? "No drivers found matching your search" : "No drivers registered yet"}
+                    actionText={searchQuery ? "" : "Add First Driver"}
+                    onAction={searchQuery ? undefined : () => {
+                      setIsEditMode(false);
+                      setEditingDriverId(null);
+                      setForm({ name: "", phone: "", ghanaCard: "", password: "", isApproved: false });
+                      setOpen(true);
+                    }}
+                  />
                 </TableCell>
               </TableRow>
             ) : (
-              drivers.map((d) => (
-                <TableRow key={d._id} hover>
+              filteredDrivers.map((d) => (
+                <TableRow key={d._id}>
                   <TableCell>{d.name}</TableCell>
                   <TableCell>{d.ghanaCard}</TableCell>
                   <TableCell>{d.phone}</TableCell>
                   <TableCell>
                     <Chip
                       label={d.isApproved ? "Approved" : "Pending"}
-                      color={d.isApproved ? "success" : "warning"}
+                      color={d.isApproved ? "success" : "error"}
                       size="small"
+                      sx={{ color: "white" }}
                     />
                   </TableCell>
                   <TableCell>
+                    <Tooltip title="Edit Driver">
+                      <IconButton
+                        onClick={() => handleEdit(d)}
+                        aria-label={`Edit ${d.name}`}
+                        sx={{ color: '#1976d2' }}
+                      >
+                        <Edit />
+                      </IconButton>
+                    </Tooltip>
                     {!d.isApproved && (
                       <Button
                         variant="contained"
                         size="small"
                         color="primary"
                         onClick={() => handleApprove(d._id)}
+                        sx={{ fontSize: '0.75rem', py: 0.5, px: 1.5, ml: 1 }}
                       >
                         Approve
                       </Button>
@@ -188,48 +312,75 @@ const DriverApproval = () => {
             )}
           </TableBody>
         </Table>
-      </Paper>
+      </TableContainer>
 
       <Dialog
         open={open}
-        onClose={() => setOpen(false)}
-        maxWidth="sm"
-        fullWidth
+        onClose={() => {
+          setOpen(false);
+          setIsEditMode(false);
+          setEditingDriverId(null);
+          setForm({ name: "", phone: "", ghanaCard: "", password: "", isApproved: false });
+        }}
       >
-        <DialogTitle>Add New Driver</DialogTitle>
+        <DialogTitle>{isEditMode ? "Edit Driver" : "Add New Driver"}</DialogTitle>
         <DialogContent>
           <TextField
             label="Full Name"
             fullWidth
-            margin="normal"
+            sx={{ mt: 2 }}
             value={form.name}
             onChange={(e) => setForm({ ...form, name: e.target.value })}
-            required
           />
           <TextField
             label="Phone Number"
             fullWidth
-            margin="normal"
+            sx={{ mt: 2 }}
             value={form.phone}
             onChange={(e) => setForm({ ...form, phone: e.target.value })}
-            placeholder="+233241234567"
-            helperText="Use your whitelisted number for testing"
-            required
+            placeholder="+233XXXXXXXXX or 0XXXXXXXXX"
           />
           <TextField
             label="Ghana Card Number"
             fullWidth
-            margin="normal"
+            sx={{ mt: 2 }}
             value={form.ghanaCard}
             onChange={(e) => setForm({ ...form, ghanaCard: e.target.value })}
             placeholder="GHA-123456789-0"
-            required
           />
+          <TextField
+            label="Password"
+            type="password"
+            fullWidth
+            sx={{ mt: 2 }}
+            value={form.password}
+            onChange={(e) => setForm({ ...form, password: e.target.value })}
+            placeholder={isEditMode ? "Leave blank to keep current password" : ""}
+            helperText={isEditMode ? "Optional: Only fill if you want to change password" : "Minimum 6 characters"}
+          />
+          {isEditMode && (
+            <FormControl fullWidth sx={{ mt: 2 }}>
+              <InputLabel>Status</InputLabel>
+              <Select
+                value={form.isApproved}
+                label="Status"
+                onChange={(e) => setForm({ ...form, isApproved: e.target.value })}
+              >
+                <MenuItem value={false}>Pending</MenuItem>
+                <MenuItem value={true}>Approved</MenuItem>
+              </Select>
+            </FormControl>
+          )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setOpen(false)}>Cancel</Button>
-          <Button variant="contained" onClick={handleAddDriver}>
-            Add Driver
+          <Button onClick={() => {
+            setOpen(false);
+            setIsEditMode(false);
+            setEditingDriverId(null);
+            setForm({ name: "", phone: "", ghanaCard: "", password: "", isApproved: false });
+          }}>Cancel</Button>
+          <Button variant="contained" onClick={isEditMode ? handleUpdate : handleAddDriver}>
+            {isEditMode ? "Update" : "Add"}
           </Button>
         </DialogActions>
       </Dialog>
