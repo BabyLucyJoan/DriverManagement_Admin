@@ -28,9 +28,10 @@ import {
   DialogActions,
   Chip,
   TextField,
-  InputAdornment
+  InputAdornment,
+  IconButton
 } from "@mui/material";
-import { Add, Search, Visibility } from "@mui/icons-material";
+import { Add, Search, Visibility, Delete } from "@mui/icons-material";
 
 const Penalties = () => {
   const { user } = useContext(AuthContext);
@@ -40,14 +41,23 @@ const Penalties = () => {
   const [open, setOpen] = useState(false);
   const [viewOpen, setViewOpen] = useState(false);
   const [viewDriver, setViewDriver] = useState(null);
+  const [driverPenalties, setDriverPenalties] = useState([]);
+  const [loadingPenalties, setLoadingPenalties] = useState(false);
   const [penaltyType, setPenaltyType] = useState("");
   const [penaltyAmount, setPenaltyAmount] = useState(0);
   const [reason, setReason] = useState("");
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [penaltyToDelete, setPenaltyToDelete] = useState(null);
+  const [penaltyCounts, setPenaltyCounts] = useState({});
 
-  const hasPermission =
+  const hasAddPermission =
     user.role === "admin" || user.permissions.includes("add_penalties");
+  const hasViewPermission =
+    user.role === "admin" || user.permissions.includes("view_penalties");
+  const hasDeletePermission =
+    user.role === "admin" || user.permissions.includes("delete_penalties");
 
   useEffect(() => {
     const controller = new AbortController();
@@ -56,12 +66,30 @@ const Penalties = () => {
       setLoading(true);
       try {
         const res = await api.get("/drivers", { signal: controller.signal });
+        console.log(res.data)
         setDrivers(res.data);
+
+        // Fetch penalty counts for each driver
+        const counts = {};
+        await Promise.all(
+          res.data.map(async (driver) => {
+            try {
+              const penaltyRes = await api.get(`/penalties/driver/${driver._id}`);
+              counts[driver._id] = Array.isArray(penaltyRes.data.penalties)
+                ? penaltyRes.data.penalties.length
+                : 0;
+            } catch {
+              counts[driver._id] = 0;
+            }
+          })
+        );
+        setPenaltyCounts(counts);
       } catch (err) {
         if (!axios.isCancel(err)) {
           toast.error("Failed to load drivers");
         }
       } finally {
+        // Only hide loading after both drivers and penalty counts are fetched
         setLoading(false);
       }
     };
@@ -92,16 +120,82 @@ const Penalties = () => {
         reason,
       });
       setOpen(false);
+      const driverId = selectedDriver._id;
       setSelectedDriver(null);
       setPenaltyType("");
       setPenaltyAmount(0);
       setReason("");
       toast.success("Penalty added successfully");
-      // Refresh drivers list to update penalty counts
-      const res = await api.get("/drivers");
-      setDrivers(res.data);
+
+      // Update penalty count for the specific driver
+      try {
+        const penaltyRes = await api.get(`/penalties/driver/${driverId}`);
+        setPenaltyCounts(prev => ({
+          ...prev,
+          [driverId]: Array.isArray(penaltyRes.data.penalties)
+            ? penaltyRes.data.penalties.length
+            : 0
+        }));
+      } catch {
+        // Fallback: just increment the count
+        setPenaltyCounts(prev => ({
+          ...prev,
+          [driverId]: (prev[driverId] || 0) + 1
+        }));
+      }
     } catch (err) {
       toast.error(err.response?.data?.message || "Failed to add penalty");
+    }
+  };
+
+  // Fetch penalties for a specific driver
+  const fetchDriverPenalties = async (driverId) => {
+    setLoadingPenalties(true);
+    try {
+      const res = await api.get(`/penalties/driver/${driverId}`);
+      // Ensure we always set an array
+      setDriverPenalties(Array.isArray(res.data.penalties) ? res.data.penalties : []);
+    } catch {
+      toast.error("Failed to load penalties");
+      setDriverPenalties([]);
+    } finally {
+      setLoadingPenalties(false);
+    }
+  };
+
+  // Delete a penalty
+  const handleDeletePenalty = async () => {
+    if (!penaltyToDelete) return;
+
+    try {
+      await api.delete(`/penalties/${penaltyToDelete}`);
+      toast.success("Penalty deleted successfully");
+      // Refresh the driver's penalties
+      if (viewDriver) {
+        await fetchDriverPenalties(viewDriver._id);
+
+        // Update penalty count for the specific driver
+        try {
+          const penaltyRes = await api.get(`/penalties/driver/${viewDriver._id}`);
+          setPenaltyCounts(prev => ({
+            ...prev,
+            [viewDriver._id]: Array.isArray(penaltyRes.data.penalties)
+              ? penaltyRes.data.penalties.length
+              : 0
+          }));
+        } catch {
+          // Fallback: just decrement the count
+          setPenaltyCounts(prev => ({
+            ...prev,
+            [viewDriver._id]: Math.max((prev[viewDriver._id] || 0) - 1, 0)
+          }));
+        }
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to delete penalty");
+    } finally {
+      setDeleteDialogOpen(false);
+      setPenaltyToDelete(null);
     }
   };
 
@@ -109,7 +203,7 @@ const Penalties = () => {
     d.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  if (!hasPermission) return <Navigate to="/unauthorized" />;
+  if (!hasViewPermission) return <Navigate to="/unauthorized" />;
 
   if (loading) {
     return <LoadingSpinner text="Loading drivers..." />;
@@ -173,10 +267,12 @@ const Penalties = () => {
                 <TableCell>{d.ghanaCard}</TableCell>
                 <TableCell>
                   <Chip
-                    label={d.penalties.length}
-                    color="warning"
+                    label={penaltyCounts[d._id] || 0}
+                    color={penaltyCounts[d._id] > 0 ? "error" : "default"}
                     size="small"
-                    sx={{ color: "white" }}
+                    sx={{
+                      color: penaltyCounts[d._id] > 0 ? "white" : "inherit"
+                    }}
                   />
                 </TableCell>
                 <TableCell>
@@ -184,29 +280,32 @@ const Penalties = () => {
                     variant="outlined"
                     size="small"
                     startIcon={<Visibility />}
-                    onClick={() => {
+                    onClick={async () => {
                       setViewDriver(d);
                       setViewOpen(true);
+                      await fetchDriverPenalties(d._id);
                     }}
                     sx={{ mr: 1, py: 0.5, px: 1.5, fontSize: '0.75rem' }}
                   >
                     View
                   </Button>
-                  <Button
-                    variant="outlined"
-                    size="small"
-                    startIcon={<Add />}
-                    onClick={() => {
-                      setSelectedDriver(d);
-                      setPenaltyType("");
-                      setPenaltyAmount(0);
-                      setReason("");
-                      setOpen(true);
-                    }}
-                    sx={{ py: 0.5, px: 1.5, fontSize: '0.75rem' }}
-                  >
-                    Add Penalty
-                  </Button>
+                  {hasAddPermission && (
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      startIcon={<Add />}
+                      onClick={() => {
+                        setSelectedDriver(d);
+                        setPenaltyType("");
+                        setPenaltyAmount(0);
+                        setReason("");
+                        setOpen(true);
+                      }}
+                      sx={{ py: 0.5, px: 1.5, fontSize: '0.75rem' }}
+                    >
+                      Add Penalty
+                    </Button>
+                  )}
                 </TableCell>
               </TableRow>
               ))
@@ -293,6 +392,7 @@ const Penalties = () => {
         onClose={() => {
           setViewOpen(false);
           setViewDriver(null);
+          setDriverPenalties([]);
         }}
         maxWidth="md"
         fullWidth
@@ -301,7 +401,11 @@ const Penalties = () => {
           Penalties for {viewDriver?.name}
         </DialogTitle>
         <DialogContent>
-          {viewDriver && viewDriver.penalties.length === 0 ? (
+          {loadingPenalties ? (
+            <Box sx={{ py: 3, textAlign: "center" }}>
+              <LoadingSpinner text="Loading penalties..." />
+            </Box>
+          ) : driverPenalties.length === 0 ? (
             <Box sx={{ py: 3, textAlign: "center" }}>
               <Typography variant="body1" color="text.secondary">
                 No penalties recorded for this driver
@@ -316,17 +420,33 @@ const Penalties = () => {
                     <TableCell>Amount (GHS)</TableCell>
                     <TableCell>Reason</TableCell>
                     <TableCell>Date</TableCell>
+                    {hasDeletePermission && <TableCell>Action</TableCell>}
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {viewDriver?.penalties.map((penalty, index) => (
-                    <TableRow key={index}>
+                  {driverPenalties.map((penalty) => (
+                    <TableRow key={penalty._id}>
                       <TableCell>{penalty.type}</TableCell>
                       <TableCell>{penalty.amount}</TableCell>
                       <TableCell>{penalty.reason}</TableCell>
                       <TableCell>
                         {new Date(penalty.createdAt).toLocaleDateString()}
                       </TableCell>
+                      {hasDeletePermission && (
+                        <TableCell>
+                          <IconButton
+                            color="error"
+                            size="small"
+                            onClick={() => {
+                              setPenaltyToDelete(penalty._id);
+                              setDeleteDialogOpen(true);
+                            }}
+                            title="Delete penalty"
+                          >
+                            <Delete fontSize="small" />
+                          </IconButton>
+                        </TableCell>
+                      )}
                     </TableRow>
                   ))}
                 </TableBody>
@@ -338,8 +458,42 @@ const Penalties = () => {
           <Button onClick={() => {
             setViewOpen(false);
             setViewDriver(null);
+            setDriverPenalties([]);
           }}>
             Close
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog
+        open={deleteDialogOpen}
+        onClose={() => {
+          setDeleteDialogOpen(false);
+          setPenaltyToDelete(null);
+        }}
+      >
+        <DialogTitle>Confirm Delete</DialogTitle>
+        <DialogContent>
+          <Typography>
+            Are you sure you want to delete this penalty?
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button
+            onClick={() => {
+              setDeleteDialogOpen(false);
+              setPenaltyToDelete(null);
+            }}
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            color="error"
+            onClick={handleDeletePenalty}
+          >
+            Delete
           </Button>
         </DialogActions>
       </Dialog>

@@ -44,7 +44,6 @@ const DriverApproval = () => {
     name: "",
     phone: "",
     ghanaCard: "",
-    password: "",
     isApproved: false,
   });
   const [loading, setLoading] = useState(true);
@@ -90,7 +89,6 @@ const DriverApproval = () => {
       name: driver.name,
       phone: driver.phone,
       ghanaCard: driver.ghanaCard,
-      password: "",
       isApproved: driver.isApproved,
     });
     setOpen(true);
@@ -98,58 +96,6 @@ const DriverApproval = () => {
 
   const handleUpdate = async () => {
     if (!form.name || !form.phone || !form.ghanaCard) {
-      toast.error("All fields except password are required");
-      return;
-    }
-
-    // Name validation
-    if (!VALIDATION.NAME.test(form.name)) {
-      toast.error(ERROR_MESSAGES.NAME_INVALID);
-      return;
-    }
-
-    // Phone validation
-    if (!VALIDATION.PHONE.test(form.phone)) {
-      toast.error(ERROR_MESSAGES.PHONE_INVALID);
-      return;
-    }
-
-    // Ghana Card validation
-    if (!VALIDATION.GHANA_CARD.test(form.ghanaCard)) {
-      toast.error(ERROR_MESSAGES.GHANA_CARD_INVALID);
-      return;
-    }
-
-    // Password validation (only if provided)
-    if (form.password && form.password.length < 6) {
-      toast.error("Password must be at least 6 characters");
-      return;
-    }
-
-    try {
-      const updateData = {
-        name: form.name,
-        phone: form.phone,
-        ghanaCard: form.ghanaCard,
-        isApproved: form.isApproved,
-      };
-      if (form.password) {
-        updateData.password = form.password;
-      }
-      await api.put(`/drivers/${editingDriverId}`, updateData);
-      setOpen(false);
-      setIsEditMode(false);
-      setEditingDriverId(null);
-      setForm({ name: "", phone: "", ghanaCard: "", password: "", isApproved: false });
-      fetchDrivers();
-      toast.success("Driver updated successfully");
-    } catch {
-      toast.error("Failed to update driver");
-    }
-  };
-
-  const handleAddDriver = async () => {
-    if (!form.name || !form.phone || !form.ghanaCard || !form.password) {
       toast.error("All fields are required");
       return;
     }
@@ -172,22 +118,58 @@ const DriverApproval = () => {
       return;
     }
 
-    // Password validation
-    if (form.password.length < 6) {
-      toast.error("Password must be at least 6 characters");
+    try {
+      const updateData = {
+        name: form.name,
+        phone: form.phone,
+        ghanaCard: form.ghanaCard,
+        isApproved: form.isApproved,
+      };
+      await api.put(`/drivers/${editingDriverId}`, updateData);
+      setOpen(false);
+      setIsEditMode(false);
+      setEditingDriverId(null);
+      setForm({ name: "", phone: "", ghanaCard: "", isApproved: false });
+      fetchDrivers();
+      toast.success("Driver updated successfully");
+    } catch {
+      toast.error("Failed to update driver");
+    }
+  };
+
+  const handleAddDriver = async () => {
+    if (!form.name || !form.phone || !form.ghanaCard) {
+      toast.error("All fields are required");
+      return;
+    }
+
+    // Name validation
+    if (!VALIDATION.NAME.test(form.name)) {
+      toast.error(ERROR_MESSAGES.NAME_INVALID);
+      return;
+    }
+
+    // Phone validation
+    if (!VALIDATION.PHONE.test(form.phone)) {
+      toast.error(ERROR_MESSAGES.PHONE_INVALID);
+      return;
+    }
+
+    // Ghana Card validation
+    if (!VALIDATION.GHANA_CARD.test(form.ghanaCard)) {
+      toast.error(ERROR_MESSAGES.GHANA_CARD_INVALID);
       return;
     }
 
     try {
-      await api.post("/auth/driver/register", {
+      await api.post("/drivers/register", {
         name: form.name,
         phone: form.phone,
         ghanaCard: form.ghanaCard,
-        password: form.password,
       });
 
       setOpen(false);
-      setForm({ name: "", phone: "", ghanaCard: "", password: "" });
+      setForm({ name: "", phone: "", ghanaCard: "" });
       fetchDrivers();
       toast.success("Driver added successfully!");
     } catch {
@@ -219,7 +201,7 @@ const DriverApproval = () => {
           onClick={() => {
             setIsEditMode(false);
             setEditingDriverId(null);
-            setForm({ name: "", phone: "", ghanaCard: "", password: "", isApproved: false });
+            setForm({ name: "", phone: "", ghanaCard: "", isApproved: false });
             setOpen(true);
           }}
         >
@@ -264,7 +246,7 @@ const DriverApproval = () => {
                     onAction={searchQuery ? undefined : () => {
                       setIsEditMode(false);
                       setEditingDriverId(null);
-                      setForm({ name: "", phone: "", ghanaCard: "", password: "", isApproved: false });
+                      setForm({ name: "", phone: "", ghanaCard: "", isApproved: false });
                       setOpen(true);
                     }}
                   />
@@ -319,7 +301,7 @@ const DriverApproval = () => {
           setOpen(false);
           setIsEditMode(false);
           setEditingDriverId(null);
-          setForm({ name: "", phone: "", ghanaCard: "", password: "", isApproved: false });
+          setForm({ name: "", phone: "", ghanaCard: "", isApproved: false });
         }}
       >
         <DialogTitle>{isEditMode ? "Edit Driver" : "Add New Driver"}</DialogTitle>
@@ -347,16 +329,6 @@ const DriverApproval = () => {
             onChange={(e) => setForm({ ...form, ghanaCard: e.target.value })}
             placeholder="GHA-123456789-0"
           />
-          <TextField
-            label="Password"
-            type="password"
-            fullWidth
-            sx={{ mt: 2 }}
-            value={form.password}
-            onChange={(e) => setForm({ ...form, password: e.target.value })}
-            placeholder={isEditMode ? "Leave blank to keep current password" : ""}
-            helperText={isEditMode ? "Optional: Only fill if you want to change password" : "Minimum 6 characters"}
-          />
           {isEditMode && (
             <FormControl fullWidth sx={{ mt: 2 }}>
               <InputLabel>Status</InputLabel>
@@ -376,7 +348,7 @@ const DriverApproval = () => {
             setOpen(false);
             setIsEditMode(false);
             setEditingDriverId(null);
-            setForm({ name: "", phone: "", ghanaCard: "", password: "", isApproved: false });
+            setForm({ name: "", phone: "", ghanaCard: "", isApproved: false });
           }}>Cancel</Button>
           <Button variant="contained" onClick={isEditMode ? handleUpdate : handleAddDriver}>
             {isEditMode ? "Update" : "Add"}

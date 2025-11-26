@@ -9,13 +9,8 @@ import {
   TableHead,
   TableRow,
   Paper,
-  Chip,
   TextField,
   InputAdornment,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
   TablePagination,
   Grid,
 } from "@mui/material";
@@ -32,23 +27,11 @@ export default function AuditLog() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [actionFilter] = useState("");
-  const [ setAvailableActions] = useState([]);
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(20);
   const [totalCount, setTotalCount] = useState(0);
-
-  const fetchActions = async (signal) => {
-    try {
-      const res = await api.get("/audit/actions", { signal });
-      setAvailableActions(res.data);
-    } catch (err) {
-      if (!axios.isCancel(err)) {
-        toast.error("Failed to load available actions");
-      }
-    }
-  };
 
   const fetchLogs = async (signal) => {
     setLoading(true);
@@ -81,7 +64,6 @@ export default function AuditLog() {
 
   useEffect(() => {
     const controller = new AbortController();
-    fetchActions(controller.signal);
     return () => controller.abort();
   }, []);
 
@@ -189,7 +171,6 @@ export default function AuditLog() {
               <TableCell>Action</TableCell>
               <TableCell>Performed By</TableCell>
               <TableCell>Target</TableCell>
-              <TableCell>Details</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -219,18 +200,13 @@ export default function AuditLog() {
                     </Typography>
                   </TableCell>
                   <TableCell>
-                    <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                      {log.performedByDetails.name}
+                   <Typography variant="body2" sx={{ fontSize: "0.875rem" }}>
+                      {log?.performedByDetails?.name }
                     </Typography>
                   </TableCell>
                   <TableCell>
                     <Typography variant="body2" sx={{ fontWeight: 500 }}>
                       {log.target}
-                    </Typography>
-                  </TableCell>
-                  <TableCell>
-                    <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                      {log.details}
                     </Typography>
                   </TableCell>
                 </TableRow>
