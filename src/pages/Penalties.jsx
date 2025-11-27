@@ -31,7 +31,7 @@ import {
   InputAdornment,
   IconButton
 } from "@mui/material";
-import { Add, Search, Visibility, Delete } from "@mui/icons-material";
+import { Add, Search, Visibility, Delete, CheckCircle } from "@mui/icons-material";
 
 const Penalties = () => {
   const { user } = useContext(AuthContext);
@@ -58,6 +58,7 @@ const Penalties = () => {
     user.role === "admin" || user.permissions.includes("view_penalties");
   const hasDeletePermission =
     user.role === "admin" || user.permissions.includes("delete_penalties");
+  const hasMarkPaidPermission = user.role === "admin" 
 
   useEffect(() => {
     const controller = new AbortController();
@@ -160,6 +161,20 @@ const Penalties = () => {
       setDriverPenalties([]);
     } finally {
       setLoadingPenalties(false);
+    }
+  };
+
+  // Mark a penalty as paid
+  const handleMarkAsPaid = async (penaltyId) => {
+    try {
+      await api.patch(`/penalties/${penaltyId}/pay`);
+      toast.success("Penalty marked as paid successfully");
+      // Refresh the driver's penalties
+      if (viewDriver) {
+        await fetchDriverPenalties(viewDriver._id);
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to mark penalty as paid");
     }
   };
 
@@ -419,8 +434,9 @@ const Penalties = () => {
                     <TableCell>Type</TableCell>
                     <TableCell>Amount (GHS)</TableCell>
                     <TableCell>Reason</TableCell>
+                    <TableCell>Status</TableCell>
                     <TableCell>Date</TableCell>
-                    {hasDeletePermission && <TableCell>Action</TableCell>}
+                    {(hasDeletePermission || hasMarkPaidPermission) && <TableCell>Action</TableCell>}
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -430,21 +446,45 @@ const Penalties = () => {
                       <TableCell>{penalty.amount}</TableCell>
                       <TableCell>{penalty.reason}</TableCell>
                       <TableCell>
+                        <Chip
+                          label={penalty.isPaid ? "Paid" : "Unpaid"}
+                          color={penalty.isPaid ? "success" : "warning"}
+                          size="small"
+                          sx={{
+                            color: "white",
+                            fontWeight: 500
+                          }}
+                        />
+                      </TableCell>
+                      <TableCell>
                         {new Date(penalty.createdAt).toLocaleDateString()}
                       </TableCell>
-                      {hasDeletePermission && (
+                      {(hasDeletePermission || hasMarkPaidPermission) && (
                         <TableCell>
-                          <IconButton
-                            color="error"
-                            size="small"
-                            onClick={() => {
-                              setPenaltyToDelete(penalty._id);
-                              setDeleteDialogOpen(true);
-                            }}
-                            title="Delete penalty"
-                          >
-                            <Delete fontSize="small" />
-                          </IconButton>
+                          {hasMarkPaidPermission && !penalty.isPaid && (
+                            <IconButton
+                              color="success"
+                              size="small"
+                              onClick={() => handleMarkAsPaid(penalty._id)}
+                              title="Mark as paid"
+                              sx={{ mr: 1 }}
+                            >
+                              <CheckCircle fontSize="small" />
+                            </IconButton>
+                          )}
+                          {hasDeletePermission && (
+                            <IconButton
+                              color="error"
+                              size="small"
+                              onClick={() => {
+                                setPenaltyToDelete(penalty._id);
+                                setDeleteDialogOpen(true);
+                              }}
+                              title="Delete penalty"
+                            >
+                              <Delete fontSize="small" />
+                            </IconButton>
+                          )}
                         </TableCell>
                       )}
                     </TableRow>
