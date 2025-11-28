@@ -34,7 +34,7 @@ const Dashboard = () => {
         setStats(res.data);
       } catch (err) {
         if (!axios.isCancel(err)) {
-          toast.error("Failed to load dashboard statistics");
+          toast.error(err.response?.data?.message || "Failed to load dashboard statistics");
         }
       } finally {
         setLoading(false);

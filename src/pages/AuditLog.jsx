@@ -55,7 +55,7 @@ export default function AuditLog() {
       setTotalCount(res.data.total || res.data.logs?.length || 0);
     } catch (err) {
       if (!axios.isCancel(err)) {
-        toast.error("Failed to load audit logs");
+        toast.error(err.response?.data?.message || "Failed to load audit logs");
       }
     } finally {
       setLoading(false);

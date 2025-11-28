@@ -63,8 +63,8 @@ const DriverApproval = () => {
     try {
       const res = await api.get("/drivers");
       setDrivers(res.data);
-    } catch {
-      toast.error("Failed to load drivers");
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to load drivers");
     } finally {
       setLoading(false);
     }
@@ -77,8 +77,8 @@ const DriverApproval = () => {
         drivers.map((d) => (d._id === id ? { ...d, isApproved: true } : d))
       );
       toast.success("Driver approved successfully!");
-    } catch {
-      toast.error("Approval failed");
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Approval failed");
     }
   };
 
@@ -132,8 +132,8 @@ const DriverApproval = () => {
       setForm({ name: "", phone: "", ghanaCard: "", isApproved: false });
       fetchDrivers();
       toast.success("Driver updated successfully");
-    } catch {
-      toast.error("Failed to update driver");
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to update driver");
     }
   };
 
@@ -172,10 +172,8 @@ const DriverApproval = () => {
       setForm({ name: "", phone: "", ghanaCard: "" });
       fetchDrivers();
       toast.success("Driver added successfully!");
-    } catch {
-      toast.error(
-       "Failed to add driver"
-      );
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to add driver");
     }
   };
 

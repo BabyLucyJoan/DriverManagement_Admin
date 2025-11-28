@@ -70,14 +70,14 @@ const Penalties = () => {
         console.log(res.data)
         setDrivers(res.data);
 
-        // Fetch penalty counts for each driver
+        // Fetch penalty counts for each driver (only unpaid)
         const counts = {};
         await Promise.all(
           res.data.map(async (driver) => {
             try {
               const penaltyRes = await api.get(`/penalties/driver/${driver._id}`);
               counts[driver._id] = Array.isArray(penaltyRes.data.penalties)
-                ? penaltyRes.data.penalties.length
+                ? penaltyRes.data.penalties.filter(p => !p.isPaid).length
                 : 0;
             } catch {
               counts[driver._id] = 0;
@@ -87,7 +87,7 @@ const Penalties = () => {
         setPenaltyCounts(counts);
       } catch (err) {
         if (!axios.isCancel(err)) {
-          toast.error("Failed to load drivers");
+          toast.error(err.response?.data?.message || "Failed to load drivers");
         }
       } finally {
         // Only hide loading after both drivers and penalty counts are fetched
@@ -156,8 +156,8 @@ const Penalties = () => {
       const res = await api.get(`/penalties/driver/${driverId}`);
       // Ensure we always set an array
       setDriverPenalties(Array.isArray(res.data.penalties) ? res.data.penalties : []);
-    } catch {
-      toast.error("Failed to load penalties");
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to load penalties");
       setDriverPenalties([]);
     } finally {
       setLoadingPenalties(false);

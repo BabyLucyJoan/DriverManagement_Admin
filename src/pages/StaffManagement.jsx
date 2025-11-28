@@ -51,8 +51,8 @@ export default function StaffManagement() {
     try {
       const res = await api.get("/staff");
       setStaff(res.data);
-    } catch  {
-      toast.error("Failed to load staff members");
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to load staff members");
     } finally {
       setLoading(false);
     }
@@ -62,8 +62,8 @@ export default function StaffManagement() {
     try {
       const res = await api.get("/permissions");
       setAvailablePermissions(res.data);
-    } catch {
-      toast.error("Failed to load permissions");
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to load permissions");
     }
   };
 
@@ -117,7 +117,7 @@ export default function StaffManagement() {
       toast.success("Staff member added successfully");
     } catch(err) {
       console.log(err)
-      toast.error("Failed to add staff member");
+      toast.error(err.response?.data?.message || "Failed to add staff member");
     }
   };
 
@@ -179,8 +179,8 @@ export default function StaffManagement() {
       setPermissions([]);
       fetchStaff();
       toast.success("Staff member updated successfully");
-    } catch {
-      toast.error("Failed to update staff member");
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to update staff member");
     }
   };
 
@@ -192,7 +192,7 @@ export default function StaffManagement() {
         toast.success("Staff member deleted successfully");
       } catch (err) {
         console.log(err)
-        toast.error( "Failed to delete staff member");
+        toast.error(err.response?.data?.message || "Failed to delete staff member");
       }
     }
   };
